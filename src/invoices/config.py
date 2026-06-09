@@ -17,19 +17,43 @@ _CONFIG_PATH = (
     if 'FETCH_CONFIG' in os.environ
     else Path(__file__).resolve().parents[2] / 'config.yml'
 )
-with _CONFIG_PATH.open() as f:
-    _cfg = yaml.safe_load(f)
-
-DEFAULT_SLUG: str = _cfg['default_slug']
 STATUSES = ['Paid', 'To-Pay']
-COMPANIES: dict[str, str] = _cfg['companies']
-DROPBOX_DIRS: dict[str, Path] = {k: Path(v) for k, v in _cfg['dropbox_dirs'].items()}
-DEBTOR_ACCOUNTS: dict[str, dict[str, str]] = _cfg.get('debtor_accounts', {})
 
-# Optional per-vendor retrieval recipes, used to fetch invoices NOT found in the
-# inbox (vendor portal URL / login hint / e-invoice operator). Data, not code —
-# a library that grows per vendor. Keys are matched against checklist vendor names.
-VENDOR_SOURCES: dict[str, dict] = _cfg.get('vendor_sources', {})
+# Load config.yml tolerantly. If it is missing or invalid, the package still
+# imports (so the MCP server starts and health_check can report the problem) and
+# only operations that actually need it raise, via require_config().
+# VENDOR_SOURCES holds optional per-vendor retrieval recipes (portal URL / login
+# hint / e-invoice operator), matched against checklist vendor names.
+CONFIG_ERROR: str | None = None
+try:
+    with _CONFIG_PATH.open() as f:
+        _cfg = yaml.safe_load(f) or {}
+    DEFAULT_SLUG = _cfg['default_slug']
+    COMPANIES = _cfg['companies']
+    DROPBOX_DIRS = {k: Path(v) for k, v in _cfg['dropbox_dirs'].items()}
+    DEBTOR_ACCOUNTS = _cfg.get('debtor_accounts', {})
+    VENDOR_SOURCES = _cfg.get('vendor_sources', {})
+except (OSError, KeyError, TypeError, AttributeError, yaml.YAMLError) as exc:
+    CONFIG_ERROR = (
+        f'config.yml could not be loaded from {_CONFIG_PATH} ({exc}). '
+        'Create it from config.example.yml, or set FETCH_CONFIG to its path.'
+    )
+    DEFAULT_SLUG = 'my-company'
+    COMPANIES = {}
+    DROPBOX_DIRS = {}
+    DEBTOR_ACCOUNTS = {}
+    VENDOR_SOURCES = {}
+
+
+def require_config() -> None:
+    """Raise a clear error if config.yml is missing or invalid.
+
+    Called by operations that genuinely need config (fetch, dropbox, payments)
+    so they fail fast with guidance instead of misbehaving on empty defaults.
+    """
+    if CONFIG_ERROR:
+        raise RuntimeError(CONFIG_ERROR)
+
 
 GMAIL_QUERY = (
     'in:inbox -category:(promotions OR social) '

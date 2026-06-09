@@ -33,6 +33,7 @@ from src.invoices.config import (
     DEBTOR_ACCOUNTS,
     GMAIL_QUERY,
     VENDOR_SOURCES,
+    require_config,
 )
 from src.invoices.dropbox import copy_to_dropbox as _copy_to_dropbox
 from src.invoices.gmail import (
@@ -160,6 +161,7 @@ async def fetch_invoices(
     ``query`` overrides the default invoice search; ``max_emails`` caps how many
     messages are processed. Returns the classified records and output paths.
     """
+    require_config()
     create_directories()
     messages = await search_messages(max_emails, query)
     if not messages:
@@ -263,6 +265,7 @@ async def copy_to_dropbox(
     ``companies`` (slugs), then copies each PDF from the output tree into the
     Dropbox folder configured for its company. Returns per-file results.
     """
+    require_config()
     _validate_companies(companies)
     records = _load_records()
     if not records:
@@ -297,6 +300,7 @@ def generate_payments(
 
     ``execution_date`` is the requested payment date (YYYY-MM-DD); defaults to today.
     """
+    require_config()
     _validate_companies(companies)
     records = [r for r in _load_records() if r.status == 'To-Pay']
     if companies:

@@ -11,7 +11,7 @@ from rich.prompt import Confirm
 
 from src import fetch
 
-from .config import BASE_DIR, COMPANIES, DEBTOR_ACCOUNTS
+from .config import BASE_DIR, COMPANIES, DEBTOR_ACCOUNTS, require_config
 from .dropbox import copy_to_dropbox
 from .gmail import archive_thread, create_directories, search_messages
 from .helpers import console
@@ -52,6 +52,7 @@ def fetch(max_emails: int | None):
 
 
 async def _main(max_emails: int | None):
+    require_config()
     create_directories()
     message_dicts = await search_messages(max_emails)
 
@@ -80,6 +81,7 @@ _company_slugs = ', '.join(COMPANIES.keys())
 )
 def to_dropbox(paid: bool, to_pay: bool, companies: tuple[str, ...]):
     """Copy classified invoices from output/ to Dropbox company folders."""
+    require_config()
     json_path = BASE_DIR / 'invoices.json'
     if not json_path.exists():
         console.print(
@@ -128,6 +130,7 @@ def to_dropbox(paid: bool, to_pay: bool, companies: tuple[str, ...]):
 )
 def generate_payments(companies: tuple[str, ...], execution_date: str | None):
     """Generate LHV pain.001.001.03 payment XML for To-Pay invoices."""
+    require_config()
     json_path = BASE_DIR / 'invoices.json'
     if not json_path.exists():
         console.print(
