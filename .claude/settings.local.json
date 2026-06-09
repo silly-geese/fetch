@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gog gmail -h:*)",
+      "Bash(gog gmail search:*)",
+      "Bash(gog gmail messages:*)",
+      "Bash(gog gmail get:*)",
+      "Bash(gog gmail attachment:*)",
+      "Bash(gog gmail url:*)",
+      "Bash(gog gmail history:*)"
+    ]
+  }
+}

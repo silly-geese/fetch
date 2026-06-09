@@ -1,0 +1,35 @@
+# Copy this file to config.yml and fill in your own details.
+#   cp config.example.yml config.yml
+# config.yml is gitignored. It holds your real company and bank data.
+
+# Fallback company slug used when an invoice's recipient can't be determined.
+default_slug: my-company
+
+# slug -> human-readable company name. Slugs are used in folder paths and filters.
+companies:
+  my-company: "My Company OÜ"
+  other-co: "Other Co OÜ"
+
+# slug -> Dropbox folder where classified invoices are copied (`to-dropbox`).
+dropbox_dirs:
+  my-company: "/Users/you/Dropbox/My Company/Invoices"
+  other-co: "/Users/you/Dropbox/Other Co/Invoices"
+
+# slug -> the paying (debtor) bank account used to build SEPA payment XML.
+# `name`, `iban`, and `bic` are all required to generate payments for a company.
+debtor_accounts:
+  my-company:
+    name: "My Company OÜ"
+    iban: "EE000000000000000000"
+    bic: "LHVBEE22"
+
+# Optional. Per-vendor recipes for fetching invoices that are NOT in the inbox.
+# The key is matched (case-insensitive substring) against the vendor name on the
+# accountant's missing list; the values guide the agent's retrieval. All fields
+# optional. This library grows per vendor over time.
+vendor_sources:
+  # acme:
+  #   portal_url: "https://billing.acme.com/invoices"
+  #   login_hint: "log in with the company Google account; invoices under Billing > History"
+  #   einvoice_operator: "Envoice"
+  #   notes: "monthly subscription, issued on the 1st"

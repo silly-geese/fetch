@@ -1,0 +1,20 @@
+# Placeholder config used only by the test suite (via FETCH_CONFIG in conftest).
+default_slug: my-company
+
+companies:
+  my-company: "My Company OÜ"
+  other-co: "Other Co OÜ"
+
+dropbox_dirs:
+  my-company: "/tmp/fetch-test-dropbox/my-company"
+
+debtor_accounts:
+  my-company:
+    name: "My Company OÜ"
+    iban: "EE000000000000000000"
+    bic: "LHVBEE22"
+
+vendor_sources:
+  acme:
+    portal_url: "https://billing.acme.com"
+    login_hint: "use SSO"
