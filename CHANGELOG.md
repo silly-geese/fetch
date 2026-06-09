@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1
+
+Fixes and docs. No breaking changes.
+
+Fixed:
+- The MCP server now starts even when config.yml is missing or invalid. health_check reports the problem instead of the client showing a blank disconnect, and operations that need config fail with a clear message.
+- Corrected the gog install hint (the formula moved to the openclaw tap).
+
+Changed:
+- Destination folders (dropbox_dirs) can be any path, not only Dropbox.
+
+Added:
+- Security policy (SECURITY.md) and hardening against argument injection in Gmail ids.
+- Guidance for connecting Gmail without a Google Cloud project (GOG_ACCESS_TOKEN) and for using a host agent's own Gmail connector, such as Cowork.
+
 ## 0.1.0
 
 First release. Fetch turns an accountant's "missing invoices" list into a draft reply with the files attached. It runs locally and your own agent drives it.
