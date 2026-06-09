@@ -33,24 +33,15 @@ You need [uv](https://docs.astral.sh/uv/), plus your own
 [claude](https://docs.anthropic.com/en/docs/claude-code) CLIs. The agent can check
 those for you and help you install them.
 
-> Set up the "fetch" invoice toolkit for me, then help me use it.
->
-> 1. Add an MCP server named "fetch-invoices" to your config: command `uvx`, args
->    `--from git+https://github.com/silly-geese/fetch fetch-mcp`. Set env
->    `FETCH_CONFIG` to a new file `~/fetch/config.yml` and `FETCH_OUTPUT_DIR` to
->    `~/fetch/output` (use absolute paths).
-> 2. Create `~/fetch/config.yml` from the template at
->    https://github.com/silly-geese/fetch/blob/main/config.example.yml, and ask me
->    for my company names, Dropbox folders, and bank (debtor) details to fill it in.
-> 3. Call `health_check` and confirm `gog` and `claude` are installed and signed in.
->    If not, walk me through it.
->
-> From then on, when I forward you a list of missing invoices: call
-> `parse_missing_list`, then find each one in my Gmail with `search_inbox`,
-> `get_message`, and `download_attachment`. For anything not in the inbox, call
-> `plan_retrieval` and fetch it with your own browser. Finally `draft_reply` to the
-> accountant with the files attached and a short note on anything still missing.
-> Always leave a draft for me to review; never send.
+```text
+Set up the "fetch" invoice toolkit for me, then help me use it.
+
+1. Add an MCP server named "fetch-invoices" to your config: command uvx, args --from git+https://github.com/silly-geese/fetch fetch-mcp. Set env FETCH_CONFIG to a new file ~/fetch/config.yml and FETCH_OUTPUT_DIR to ~/fetch/output (use absolute paths).
+2. Create ~/fetch/config.yml from the template at https://github.com/silly-geese/fetch/blob/main/config.example.yml, and ask me for my company names, Dropbox folders, and bank (debtor) details to fill it in.
+3. Call health_check and confirm gog and claude are installed and signed in. If not, walk me through it.
+
+From then on, when I forward you a list of missing invoices: call parse_missing_list, then find each one in my Gmail with search_inbox, get_message, and download_attachment. For anything not in the inbox, call plan_retrieval and fetch it with your own browser. Finally draft_reply to the accountant with the files attached and a short note on anything still missing. Always leave a draft for me to review; never send.
+```
 
 The MCP entry it adds looks like this:
 
