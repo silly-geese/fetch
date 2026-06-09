@@ -14,6 +14,16 @@ This server stores **no passwords or tokens**. It runs locally and shells out to
 
 If those aren't set up, every tool can tell you: call `health_check` first.
 
+**If you already have your own Gmail connector** (e.g. running inside Cowork), use
+it for search, read, archive, and draft, and use this toolkit for the parts that
+need a real file on disk. A connector returns an attachment's id but not its
+bytes, so downloading the PDF still goes through `gog` (`download_attachment`).
+Then `classify_invoice(pdf_path=…)` and `draft_reply(attachments=[…])` accept any
+local path, so they work on files from any source. You can skip the full `gog`
+OAuth client setup if you already hold a Gmail access token: `export
+GOG_ACCESS_TOKEN=…` (scope `gmail.modify`, expires hourly) lets `gog` run with no
+Cloud Console setup.
+
 ## Launching the server
 
 The server speaks MCP over **stdio**. Register it with your MCP client. The
@@ -40,9 +50,9 @@ If you cloned the repo instead, point at the clone:
 (or just `./fetch mcp`). With a clone, `config.yml` is found next to the source
 automatically.
 
-One-time setup the human does: create `config.yml` from `config.example.yml`
-(companies, the folder to file each company's invoices into — any folder, not
-only Dropbox — and debtor bank accounts). Verify with
+One-time setup the human does: create `config.yml` from `config.example.yml` with
+your companies, the folder to file each company's invoices into (any folder, not
+only Dropbox), and your debtor bank accounts. Verify with
 `./fetch onboarding` or the `health_check` tool.
 
 > Output (the `output/` tree, `invoices.json`, `SUMMARY.md`, `REPORT.md`,
@@ -60,7 +70,7 @@ only Dropbox — and debtor bank accounts). Verify with
 | `fetch_invoices(max_emails?, query?)` | The full pipeline: search Gmail, download PDFs, classify, dedupe, file under `output/`, write `invoices.json` and `SUMMARY.md`. Returns `{count, invoices[], output_dir, summary_md, invoices_json}`. |
 | `classify_invoice(pdf_path, subject?, sender?, snippet?)` | Classify one local PDF (e.g. one you downloaded yourself) into the same record shape. Does **not** move the file. |
 | `list_invoices(status?, company?)` | Read back the last fetch from `invoices.json`, filtered by status (`Paid`/`To-Pay`) and/or company slug. No network. |
-| `copy_to_dropbox(status?, companies?)` | Copy filed PDFs into each company's configured folder (`dropbox_dirs` in config.yml — any folder, not only Dropbox). Returns `{copied, skipped, errors, details[]}`. |
+| `copy_to_dropbox(status?, companies?)` | Copy filed PDFs into each company's configured folder (`dropbox_dirs` in config.yml, any folder and not only Dropbox). Returns `{copied, skipped, errors, details[]}`. |
 | `generate_payments(companies?, execution_date?)` | Build SEPA `pain.001.001.03` XML for To-Pay invoices, one file per debtor company. Derives missing BICs from Estonian IBANs. Returns `{count, files[], derived_bics[], skipped[]}`. |
 | `archive_thread(thread_id)` | Remove the INBOX label from a Gmail thread. |
 | `parse_missing_list(text)` | Turn an accountant's free-form missing/expected-invoice list (pasted text, CSV, table, email) into a structured checklist, returns `{count, items[]}`. |

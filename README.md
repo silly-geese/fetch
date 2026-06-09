@@ -103,6 +103,65 @@ uv sync
 
 Full reference and the step-by-step workflow: [SKILL.md](SKILL.md).
 
+## Connecting Gmail
+
+Fetch reads Gmail through your local `gog` CLI, so the server itself never holds
+your credentials. There are two ways to give `gog` access.
+
+**Standard, best for hands-off use.** Create a Google OAuth client once, then sign
+in. This stores a refresh token and keeps working without you:
+
+1. In Google Cloud Console: create a project, enable the Gmail API, create an
+   OAuth client of type "Desktop app", and download the client secret JSON.
+2. Register it and sign in (a browser opens for consent):
+
+   ```bash
+   gog auth credentials <client_secret.json>
+   gog auth add you@example.com --services gmail
+   gog auth doctor --check
+   ```
+
+**Quick, no Cloud project.** If you already have a Gmail access token, `gog` can
+use it directly with no OAuth client setup at all:
+
+```bash
+export GOG_ACCESS_TOKEN=<a gmail.modify-scoped token>
+```
+
+The token needs the `https://www.googleapis.com/auth/gmail.modify` scope (read
+alone is enough to search and download, but drafting and archiving need modify).
+Access tokens last about an hour and are not refreshed on this path, so it suits
+a single session rather than a long unattended run. The easiest way to mint a
+token without your own Cloud project is Google's OAuth Playground.
+
+Either way, `health_check` tells you whether Gmail is connected.
+
+## Use it inside Cowork (or any agent that already has Gmail)
+
+If your agent already has its own Gmail connector (for example Claude Cowork's
+Google Workspace connector), it can do much of the inbox work without `gog`:
+searching the inbox, reading threads, and archiving. You connect Gmail once in
+the agent's own UI, with no Cloud Console setup.
+
+Two steps still go through `gog`, because they need the real file:
+
+- **Downloading the invoice PDF to disk.** A Gmail connector returns an
+  attachment's name and id but not its bytes, and Fetch classifies, files, and
+  attaches actual files on disk.
+- **Attaching those PDFs to the draft reply.** `draft_reply` reliably attaches
+  local files; building a draft with attachments straight from the connector is
+  not confirmed yet.
+
+So a clean split is: let the connector search, read, and archive; use Fetch
+(which calls `gog`) for `download_attachment`, `classify_invoice(pdf_path=…)`,
+and `draft_reply(attachments=[…])`. Both `classify_invoice` and `draft_reply`
+take any local path, so however a PDF gets onto disk, Fetch can use it.
+
+Inside Cowork, `gog` runs in the sandbox VM, so enable network egress and
+allowlist `googleapis.com` and `accounts.google.com` so it can reach Google.
+This last part is worth a quick test in your own Cowork session; we cannot
+confirm the egress allowlist behaviour from outside it.
+
 ## Fetch invoices that are not in your inbox
 
 Some invoices arrive through a vendor's billing portal or an e-invoice platform, not email. `plan_retrieval` turns each missing item into a task your agent can act on.

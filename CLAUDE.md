@@ -25,7 +25,13 @@ pyproject.toml  # dependencies + ruff config
 
 ## Gmail
 
-Do **not** use the Gmail MCP connector. Use the `gog gmail` CLI instead.
+When working **on this codebase**, route Gmail through the `gog gmail` CLI, not a
+Gmail MCP connector, so calls go through the audited `helpers.async_run` wrapper
+and `_safe_id` validation. This is a dev convention for the code, not a rule for
+end users: a host agent (e.g. Cowork) may use its own Gmail connector for
+search / read / draft / archive. The one job that still needs `gog` is landing an
+attachment's bytes on disk (`gog gmail attachment`), since connectors return an
+attachment id but not its content, and the rest of the pipeline reads real files.
 
 ```bash
 gog gmail search "is:unread" --json
