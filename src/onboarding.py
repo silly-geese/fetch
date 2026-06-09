@@ -31,7 +31,7 @@ def check_prerequisites() -> dict:
             'name': 'gog CLI',
             'ok': bool(gog_path),
             'detail': gog_path or 'not found on PATH',
-            'hint': '' if gog_path else 'Install: brew install steipete/tap/gogcli',
+            'hint': '' if gog_path else 'Install: brew install openclaw/tap/gogcli',
         }
     )
 

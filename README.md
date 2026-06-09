@@ -31,7 +31,7 @@ block below to your MCP-capable AI agent (such as Claude Code). There is no clon
 or install step: `uvx` runs Fetch straight from this repo.
 
 You need [uv](https://docs.astral.sh/uv/), plus your own
-[gog](https://github.com/steipete/gogcli) (Gmail) and
+[gog](https://github.com/openclaw/gogcli) (Gmail, `brew install openclaw/tap/gogcli`) and
 [claude](https://docs.anthropic.com/en/docs/claude-code) CLIs. The agent can check
 those for you and help you install them.
 
