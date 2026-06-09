@@ -22,6 +22,8 @@ It can also classify and file invoices, copy them to Dropbox, and build a SEPA p
 - It drafts, it does not send. Outgoing replies are Gmail drafts you review first.
 - Local audit log. Every fetch, download, and draft is recorded in `output/audit.log`.
 
+Full posture, hardening, and the honest capability boundary: [SECURITY.md](SECURITY.md).
+
 ## Quick start: hand it to your agent
 
 Fetch is an MCP server, and the easy way to set it up and use it is to paste the

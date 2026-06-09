@@ -6,6 +6,20 @@ from pathlib import Path
 from .config import BASE_DIR, COMPANIES, GMAIL_QUERY, STAGING_DIR, STATUSES
 from .helpers import async_run, async_run_json, console
 
+_ID_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]*$')
+
+
+def _safe_id(value: str, kind: str) -> str:
+    """Validate a Gmail message/thread/attachment id before it becomes a CLI arg.
+
+    Gmail ids are base64url-ish and always start with an alphanumeric. Rejecting
+    anything else stops a crafted value (e.g. one starting with '-') from being
+    read as a flag by gog, closing argument injection.
+    """
+    if not isinstance(value, str) or not _ID_RE.match(value):
+        raise ValueError(f'unsafe {kind}: {value!r}')
+    return value
+
 
 def create_directories():
     console.rule('[bold]Step 1: Creating directory structure')
@@ -57,11 +71,13 @@ async def search_messages(
 
 async def fetch_message(message_id: str) -> dict:
     """Fetch full message metadata."""
+    message_id = _safe_id(message_id, 'message id')
     return await async_run_json(['gog', 'gmail', 'get', message_id, '--json'])
 
 
 async def fetch_thread(thread_id: str) -> dict:
     """Fetch full thread with all messages."""
+    thread_id = _safe_id(thread_id, 'thread id')
     data = await async_run_json(
         ['gog', 'gmail', 'thread', 'get', thread_id, '--full', '--json']
     )
@@ -80,6 +96,8 @@ async def download_attachment(
     a bare basename and the download is namespaced under the (sanitized) message
     id — preventing path traversal and silent same-name collisions between items.
     """
+    message_id = _safe_id(message_id, 'message id')
+    attachment_id = _safe_id(attachment_id, 'attachment id')
     safe_name = Path(filename).name
     if not safe_name or safe_name in {'.', '..'}:
         raise ValueError(f'unsafe attachment filename: {filename!r}')
@@ -106,6 +124,7 @@ async def download_attachment(
 
 async def archive_thread(thread_id: str) -> None:
     """Remove INBOX label from a thread (archive it)."""
+    thread_id = _safe_id(thread_id, 'thread id')
     await async_run(['gog', 'gmail', 'labels', 'modify', thread_id, '--remove=INBOX'])
 
 

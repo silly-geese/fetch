@@ -59,7 +59,7 @@ def test_download_attachment_sanitizes_filename(monkeypatch):
         return _FakeProc()
 
     monkeypatch.setattr(gm, 'async_run', fake)
-    p = asyncio.run(gm.download_attachment('m/../x!', 'a1', '../../evil.pdf'))
+    p = asyncio.run(gm.download_attachment('msg123', 'a1', '../../evil.pdf'))
     assert p.name == 'evil.pdf'
     assert STAGING_DIR in p.parents
     assert '../../evil.pdf' not in captured['cmd']
@@ -72,3 +72,15 @@ def test_download_attachment_rejects_dotdot(monkeypatch):
     monkeypatch.setattr(gm, 'async_run', fake)
     with pytest.raises(ValueError):
         asyncio.run(gm.download_attachment('m1', 'a1', '..'))
+
+
+def test_gmail_ids_reject_flag_like_values():
+    # ids that could be read as CLI flags (argument injection) are refused
+    with pytest.raises(ValueError):
+        asyncio.run(gm.download_attachment('-x', 'a1', 'inv.pdf'))
+    with pytest.raises(ValueError):
+        asyncio.run(gm.download_attachment('m1', '-y', 'inv.pdf'))
+    with pytest.raises(ValueError):
+        asyncio.run(gm.fetch_message('-o'))
+    with pytest.raises(ValueError):
+        asyncio.run(gm.archive_thread('--remove=INBOX'))
