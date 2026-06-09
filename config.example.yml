@@ -10,10 +10,12 @@ companies:
   my-company: "My Company OÜ"
   other-co: "Other Co OÜ"
 
-# slug -> Dropbox folder where classified invoices are copied (`to-dropbox`).
+# slug -> folder where classified invoices are copied (`to-dropbox`).
+# Any folder works: a Dropbox path, a shared/network drive, or a plain local
+# folder. The key name is historical; it does not have to be Dropbox.
 dropbox_dirs:
   my-company: "/Users/you/Dropbox/My Company/Invoices"
-  other-co: "/Users/you/Dropbox/Other Co/Invoices"
+  other-co: "/Users/you/Accounting/Other Co/Invoices"
 
 # slug -> the paying (debtor) bank account used to build SEPA payment XML.
 # `name`, `iban`, and `bic` are all required to generate payments for a company.

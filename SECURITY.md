@@ -20,8 +20,8 @@ no server you log into, and your invoice data does not flow through anyone else.
   its attachments in Gmail, and you click send.
 - **It stores no credentials.** No passwords, tokens, or API keys are read or
   written. Gmail goes through your `gog` session; classification through your
-  `claude` CLI. `config.yml` holds your company names, Dropbox folders, and
-  beneficiary bank details (not logins) and is gitignored. Outputs are
+  `claude` CLI. `config.yml` holds your company names, destination folders (any
+  path you choose), and beneficiary bank details (not logins) and is gitignored. Outputs are
   `invoices.json`, `SUMMARY.md`, `REPORT.md`, and `audit.log`; none contain secrets.
 - **It barely touches the network itself.** The only outbound request the Python
   code makes is a currency-rate lookup (`src/invoices/helpers.py`,

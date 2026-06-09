@@ -80,7 +80,7 @@ _company_slugs = ', '.join(COMPANIES.keys())
     help=f'Filter by company slug (repeatable). Choices: {_company_slugs}',
 )
 def to_dropbox(paid: bool, to_pay: bool, companies: tuple[str, ...]):
-    """Copy classified invoices from output/ to Dropbox company folders."""
+    """Copy classified invoices from output/ to each company's folder (any path)."""
     require_config()
     json_path = BASE_DIR / 'invoices.json'
     if not json_path.exists():
@@ -111,7 +111,7 @@ def to_dropbox(paid: bool, to_pay: bool, companies: tuple[str, ...]):
         console.print('[yellow]No invoices match the given filters.[/yellow]')
         return
 
-    console.print(f'Copying {len(records)} invoice(s) to Dropbox…')
+    console.print(f'Copying {len(records)} invoice(s) to their folders…')
     copy_to_dropbox(records)
 
 

@@ -78,7 +78,7 @@ def check_prerequisites() -> dict:
             }
         )
 
-    # config.yml — companies, Dropbox paths, debtor accounts.
+    # config.yml — companies, destination folders, debtor accounts.
     if not _CONFIG_PATH.exists():
         checks.append(
             {

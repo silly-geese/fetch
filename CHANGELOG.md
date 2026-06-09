@@ -8,7 +8,7 @@ Added:
 - MCP server with 16 tools, plus the `./fetch` CLI.
 - Clear a missing-invoice list: parse the list, fetch invoices from Gmail, plan fetching the rest, and draft a reply to the accountant.
 - Reconcile a missing list against what you found, and build a report.
-- Fetch and classify invoices from Gmail, file them to Dropbox, and build SEPA payment XML.
+- Fetch and classify invoices from Gmail, file them to a folder of your choice (Dropbox or any path), and build SEPA payment XML.
 - Beyond-inbox retrieval with per-vendor recipes (`config.yml` `vendor_sources`). Your agent fetches with its own browser. No portal logins are stored.
 - Local audit log of every fetch, download, and draft.
 

@@ -14,7 +14,7 @@ Small companies (and their agents) that get a periodic "please send the invoices
 2. Finds each invoice. First in your Gmail inbox. For anything not there, it hands your agent a clear task to fetch it from the vendor's portal or e-invoice platform.
 3. Drafts a reply to the accountant with the found PDFs attached, plus a note on anything still missing. You review the draft and send it.
 
-It can also classify and file invoices, copy them to Dropbox, and build a SEPA payment file. See the tool list below.
+It can also classify and file invoices, copy them to a folder of your choice (Dropbox, a shared drive, or any local folder), and build a SEPA payment file. See the tool list below.
 
 ## How it stays safe
 
@@ -39,7 +39,7 @@ those for you and help you install them.
 Set up the "fetch" invoice toolkit for me, then help me use it.
 
 1. Add an MCP server named "fetch-invoices" to your config: command uvx, args --from git+https://github.com/silly-geese/fetch fetch-mcp. Set env FETCH_CONFIG to a new file ~/fetch/config.yml and FETCH_OUTPUT_DIR to ~/fetch/output (use absolute paths).
-2. Create ~/fetch/config.yml from the template at https://github.com/silly-geese/fetch/blob/main/config.example.yml, and ask me for my company names, Dropbox folders, and bank (debtor) details to fill it in.
+2. Create ~/fetch/config.yml from the template at https://github.com/silly-geese/fetch/blob/main/config.example.yml, and ask me for my company names, the folder where each company's invoices should be filed (any folder, e.g. a Dropbox or shared-drive path), and bank (debtor) details to fill it in.
 3. Call health_check and confirm gog and claude are installed and signed in. If not, walk me through it.
 
 From then on, when I forward you a list of missing invoices: call parse_missing_list, then find each one in my Gmail with search_inbox, get_message, and download_attachment. For anything not in the inbox, call plan_retrieval and fetch it with your own browser. Finally draft_reply to the accountant with the files attached and a short note on anything still missing. Always leave a draft for me to review; never send.
@@ -99,7 +99,7 @@ uv sync
 | `read_audit` | Read the local audit log |
 | `reconcile`, `build_report` | Optional: match the list to what you found and write a summary |
 | `fetch_invoices`, `classify_invoice`, `list_invoices` | Fetch and classify invoices from Gmail |
-| `copy_to_dropbox`, `generate_payments`, `archive_thread` | File to Dropbox, build SEPA payments, archive threads |
+| `copy_to_dropbox`, `generate_payments`, `archive_thread` | File to a folder (Dropbox or any path), build SEPA payments, archive threads |
 
 Full reference and the step-by-step workflow: [SKILL.md](SKILL.md).
 
@@ -129,8 +129,8 @@ default_slug: my-company
 companies:
   my-company: "My Company OÜ"
 
-dropbox_dirs:
-  my-company: "/path/to/Dropbox/My Company/Invoices"
+dropbox_dirs:                        # any folder, not only Dropbox
+  my-company: "/path/to/My Company/Invoices"
 
 debtor_accounts:
   my-company:
@@ -149,7 +149,7 @@ Point at a config elsewhere with `FETCH_CONFIG`. Change the output folder with `
 fetch onboarding                  Check prerequisites
 fetch mcp                         Run the MCP server (stdio) for agents
 fetch invoices fetch              Fetch and classify invoices from Gmail
-fetch invoices to-dropbox         Copy classified invoices to Dropbox
+fetch invoices to-dropbox         Copy classified invoices to each company's folder
 fetch invoices generate-payments  Build SEPA payment XML for to-pay invoices
 fetch invoices reconcile          Reconcile a missing-invoice list
 fetch invoices archive            Review and archive Gmail threads

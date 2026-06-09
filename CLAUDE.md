@@ -10,7 +10,7 @@ src/            # Python package
   __init__.py   # Click root group
   __main__.py   # CLI entry
   invoices/     # "invoices" subcommand group
-config.yml      # runtime config (companies, Dropbox paths, debtor accounts)
+config.yml      # runtime config (companies, destination folders, debtor accounts)
 pyproject.toml  # dependencies + ruff config
 ```
 
@@ -52,7 +52,7 @@ uvx ruff format src/
 
 ## Key conventions
 
-- Config values (companies, Dropbox paths, debtor accounts) live in `config.yml`, not hard-coded
+- Config values (companies, destination folders, debtor accounts) live in `config.yml`, not hard-coded
 - `DEFAULT_SLUG` in `config.yml` is the fallback company slug
 - Classification uses `claude` CLI with haiku model (`classify.py`)
 - Models are plain dataclasses in `models.py`

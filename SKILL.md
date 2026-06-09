@@ -41,7 +41,8 @@ If you cloned the repo instead, point at the clone:
 automatically.
 
 One-time setup the human does: create `config.yml` from `config.example.yml`
-(companies, Dropbox folders, debtor bank accounts). Verify with
+(companies, the folder to file each company's invoices into — any folder, not
+only Dropbox — and debtor bank accounts). Verify with
 `./fetch onboarding` or the `health_check` tool.
 
 > Output (the `output/` tree, `invoices.json`, `SUMMARY.md`, `REPORT.md`,
@@ -59,7 +60,7 @@ One-time setup the human does: create `config.yml` from `config.example.yml`
 | `fetch_invoices(max_emails?, query?)` | The full pipeline: search Gmail, download PDFs, classify, dedupe, file under `output/`, write `invoices.json` and `SUMMARY.md`. Returns `{count, invoices[], output_dir, summary_md, invoices_json}`. |
 | `classify_invoice(pdf_path, subject?, sender?, snippet?)` | Classify one local PDF (e.g. one you downloaded yourself) into the same record shape. Does **not** move the file. |
 | `list_invoices(status?, company?)` | Read back the last fetch from `invoices.json`, filtered by status (`Paid`/`To-Pay`) and/or company slug. No network. |
-| `copy_to_dropbox(status?, companies?)` | Copy filed PDFs into each company's Dropbox folder. Returns `{copied, skipped, errors, details[]}`. |
+| `copy_to_dropbox(status?, companies?)` | Copy filed PDFs into each company's configured folder (`dropbox_dirs` in config.yml — any folder, not only Dropbox). Returns `{copied, skipped, errors, details[]}`. |
 | `generate_payments(companies?, execution_date?)` | Build SEPA `pain.001.001.03` XML for To-Pay invoices, one file per debtor company. Derives missing BICs from Estonian IBANs. Returns `{count, files[], derived_bics[], skipped[]}`. |
 | `archive_thread(thread_id)` | Remove the INBOX label from a Gmail thread. |
 | `parse_missing_list(text)` | Turn an accountant's free-form missing/expected-invoice list (pasted text, CSV, table, email) into a structured checklist, returns `{count, items[]}`. |
@@ -107,7 +108,8 @@ found/still-missing summary to paste into the reply body.
 2. **`fetch_invoices(max_emails=…)`**: pull and classify recent invoices. Start
    small, then run wider.
 3. **`list_invoices(status="to-pay")`**: review what's outstanding.
-4. **`copy_to_dropbox()`**: file the PDFs into the Dropbox company folders.
+4. **`copy_to_dropbox()`**: file the PDFs into each company's configured folder
+   (any folder, not only Dropbox).
 5. **`generate_payments()`**: produce the bank-ready SEPA XML for To-Pay
    invoices. Check `skipped[]` for anything missing bank details.
 6. **`archive_thread(thread_id)`**: tidy the inbox once a thread is handled.

@@ -259,11 +259,13 @@ def list_invoices(status: str | None = None, company: str | None = None) -> dict
 async def copy_to_dropbox(
     status: str | None = None, companies: list[str] | None = None
 ) -> dict:
-    """Copy classified invoices into their Dropbox company folders.
+    """Copy classified invoices into each company's configured folder.
 
     Reads invoices.json, optionally filters by ``status`` ("Paid"/"To-Pay") and
     ``companies`` (slugs), then copies each PDF from the output tree into the
-    Dropbox folder configured for its company. Returns per-file results.
+    folder configured for its company (the ``dropbox_dirs`` map in config.yml).
+    That folder can be any path: a Dropbox folder, a shared/network drive, or a
+    plain local folder. Returns per-file results.
     """
     require_config()
     _validate_companies(companies)
@@ -282,7 +284,7 @@ async def copy_to_dropbox(
         records = [r for r in records if r.status == norm]
     if companies:
         records = [r for r in records if r.company in companies]
-    # shutil.copy2 over (possibly networked) Dropbox paths can block — offload
+    # shutil.copy2 over (possibly networked) destination paths can block — offload
     # it so the stdio server's event loop stays responsive.
     return await anyio.to_thread.run_sync(_copy_to_dropbox, records)
 
