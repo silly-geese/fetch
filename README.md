@@ -11,14 +11,14 @@ Small companies (and their agents) that get a periodic "please send the invoices
 ## What it does
 
 1. Reads the accountant's list, in any format (pasted text, a table, an email).
-2. Finds each invoice. First in your Gmail inbox. For anything not there, it hands your agent a clear task to fetch it from the vendor's portal or e-invoice platform.
+2. Finds each invoice. First in your email (one mailbox or several, Gmail or IMAP). For anything not there, it hands your agent a clear task to fetch it from the vendor's portal or e-invoice platform.
 3. Drafts a reply to the accountant with the found PDFs attached, plus a note on anything still missing. You review the draft and send it.
 
 It can also classify and file invoices, copy them to a folder of your choice (Dropbox, a shared drive, or any local folder), and build a SEPA payment file. See the tool list below.
 
 ## How it stays safe
 
-- No stored credentials. It uses your local `gog` (Gmail) and `claude` CLIs.
+- No stored credentials. It uses your local `gog` (Gmail) and `claude` CLIs. IMAP passwords come from environment variables, never from config.
 - It drafts, it does not send. Outgoing replies are Gmail drafts you review first.
 - Local audit log. Every fetch, download, and draft is recorded in `output/audit.log`.
 
@@ -93,12 +93,12 @@ uv sync
 |------|--------------|
 | `health_check` | Check gog, claude, Gmail auth, and config.yml |
 | `parse_missing_list` | Turn a free-form missing list into a checklist |
-| `search_inbox`, `get_message`, `download_attachment` | Find and pull invoice PDFs from Gmail |
+| `search_inbox`, `get_message`, `download_attachment` | Find and pull invoice PDFs from your mailboxes |
 | `plan_retrieval` | Build tasks to fetch invoices that are not in the inbox |
 | `draft_reply` | Draft a reply to the accountant with files attached (never sends) |
 | `read_audit` | Read the local audit log |
 | `reconcile`, `build_report` | Optional: match the list to what you found and write a summary |
-| `fetch_invoices`, `classify_invoice`, `list_invoices` | Fetch and classify invoices from Gmail |
+| `fetch_invoices`, `classify_invoice`, `list_invoices` | Fetch and classify invoices from all your mailboxes |
 | `copy_to_dropbox`, `generate_payments`, `archive_thread` | File to a folder (Dropbox or any path), build SEPA payments, archive threads |
 
 Full reference and the step-by-step workflow: [SKILL.md](SKILL.md).
@@ -135,6 +135,36 @@ a single session rather than a long unattended run. The easiest way to mint a
 token without your own Cloud project is Google's OAuth Playground.
 
 Either way, `health_check` tells you whether Gmail is connected.
+
+## Multiple email accounts
+
+By default Fetch searches the Gmail account `gog` is signed in to. To search several mailboxes in one run, list them under `email_accounts` in `config.yml`:
+
+```yaml
+email_accounts:
+  # Google-hosted mailboxes (gmail.com or any Workspace domain)
+  - address: you@example.com
+  - address: info@other-domain.com
+
+  # Any other mailbox via IMAP
+  - address: user@elsewhere.com
+    provider: imap
+    imap:
+      host: imap.elsewhere.com
+      port: 993                       # optional, default 993
+      username: user@elsewhere.com    # optional, defaults to address
+      password_env: ELSEWHERE_IMAP_PASSWORD
+      folder: INBOX                   # optional
+      archive_folder: Archive         # optional, used when archiving
+```
+
+Google accounts need `gog auth add <address>` once each. The domain does not matter, only that the mailbox is hosted on Google. When accounts span more than one Workspace domain, create the OAuth client as "External" and add each address as a test user while the app is unverified.
+
+IMAP passwords are never stored in `config.yml`. Set `password_env` to the name of an environment variable and export it before running. For providers with two-factor auth, use an app password.
+
+Searches cover all accounts at once, and one failing account does not stop the others. Message and thread ids are scoped to the account they came from, so the MCP tools take an optional `account` parameter (only needed when several accounts are configured). Draft replies always go through a Google account.
+
+`./fetch onboarding` (or the `health_check` tool) checks all of this: gog auth for each Google account, whether each Gmail-configured domain is actually Google-hosted, and IMAP connectivity.
 
 ## Use it inside Cowork (or any agent that already has Gmail)
 
@@ -198,6 +228,7 @@ debtor_accounts:
     bic: "LHVBEE22"
 
 vendor_sources: {}   # optional, see "Fetch invoices that are not in your inbox"
+email_accounts: []   # optional, see "Multiple email accounts"
 ```
 
 Point at a config elsewhere with `FETCH_CONFIG`. Change the output folder with `FETCH_OUTPUT_DIR`.
@@ -238,7 +269,9 @@ src/
     reconcile.py    Parse a missing list, match it, build a report
     retrieval.py    Plan fetching invoices not in the inbox
     audit.py        Local audit log
-    gmail.py        Gmail search, download, draft reply (via gog)
+    providers.py    Mailbox abstraction + multi-account search
+    gmail.py        Google-hosted mailboxes (via gog), draft replies
+    imap.py         Any other mailbox via IMAP
     classify.py     AI classification (claude)
     payment_xml.py  SEPA payment XML
     config.py, models.py, helpers.py, process.py, dropbox.py, summary.py

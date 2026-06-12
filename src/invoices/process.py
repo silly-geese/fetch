@@ -13,8 +13,7 @@ from rich.progress import (
 )
 
 from .classify import _format_thread_context, classify_pdf
-from .config import BASE_DIR
-from .gmail import download_attachment, fetch_message, fetch_thread
+from .config import BASE_DIR, COMPANIES, STAGING_DIR, STATUSES
 from .helpers import console, sha1_file
 from .models import InvoiceRecord
 
@@ -22,6 +21,20 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .models import Classification
+    from .providers import MailProvider
+
+
+def create_directories():
+    console.rule('[bold]Step 1: Creating directory structure')
+    for status in STATUSES:
+        for slug in COMPANIES:
+            d = BASE_DIR / status / slug
+            d.mkdir(parents=True, exist_ok=True)
+    STAGING_DIR.mkdir(parents=True, exist_ok=True)
+    console.print(
+        f'  Created directories under [bold]{BASE_DIR}[/bold] and [bold]{STAGING_DIR}[/bold]'
+    )
+
 
 # ── Dedup state ──────────────────────────────────────────────────────────────
 
@@ -45,6 +58,7 @@ def is_duplicate(pdf_path, target_dir):
 
 
 async def process_thread(
+    provider: MailProvider,
     thread_id: str,
     matched_message_ids: list[str],
     index: int,
@@ -58,12 +72,12 @@ async def process_thread(
 
     async with semaphore:
         console.print(
-            f'\n[bold]--- Thread {index}/{total}: {thread_id} '
+            f'\n[bold]--- Thread {index}/{total}: {thread_id} [{provider.label}] '
             f'({len(matched_message_ids)} matched message(s)) ---[/bold]'
         )
 
         try:
-            thread = await fetch_thread(thread_id)
+            thread = await provider.fetch_thread(thread_id)
         except Exception as exc:
             console.print(f'  [red]ERROR:[/red] Could not fetch thread: {exc}')
             progress.advance(task_id)
@@ -84,7 +98,7 @@ async def process_thread(
 
             # Thread messages use raw Gmail format; fetch normalized version
             try:
-                msg = await fetch_message(mid)
+                msg = await provider.fetch_message(mid)
             except Exception as exc:
                 console.print(f'  [dim]Could not fetch message {mid}: {exc}[/dim]')
                 continue
@@ -111,7 +125,7 @@ async def process_thread(
                 att_filename = att['filename']
                 console.print(f'\n  Attachment: [cyan]{att_filename}[/cyan]')
 
-                pdf_path = await download_attachment(mid, att_id, att_filename)
+                pdf_path = await provider.download_attachment(mid, att_id, att_filename)
                 if not pdf_path.exists():
                     console.print(
                         f'  [red]ERROR:[/red] Download failed for {att_filename}'
@@ -217,6 +231,7 @@ async def process_thread(
                     is_overdue=classification.is_overdue,
                     doc_date=classification.doc_date,
                     thread_id=thread_id,
+                    account=provider.address,
                     sha1=sha1,
                     invoice_number=classification.invoice_number,
                     beneficiary_name=classification.beneficiary_name,
@@ -233,11 +248,13 @@ async def process_thread(
 async def process_messages(message_dicts: list[dict]) -> list[InvoiceRecord]:
     console.rule('[bold]Step 3: Processing threads')
 
-    # Group messages by threadId
-    threads: dict[str, list[str]] = {}
+    # Group messages by (account, threadId) — thread IDs are account-scoped,
+    # so every operation must go through the originating provider
+    threads: dict[tuple[str, str], tuple[MailProvider, list[str]]] = {}
     for md in message_dicts:
         tid = md.get('threadId', '') or md['id']
-        threads.setdefault(tid, []).append(md['id'])
+        key = (md['account'], tid)
+        threads.setdefault(key, (md['provider'], []))[1].append(md['id'])
 
     semaphore = asyncio.Semaphore(5)
     records: list[InvoiceRecord] = []
@@ -253,9 +270,11 @@ async def process_messages(message_dicts: list[dict]) -> list[InvoiceRecord]:
 
         tasks = [
             asyncio.ensure_future(
-                process_thread(tid, mids, i, len(threads), semaphore, progress, task_id)
+                process_thread(
+                    provider, tid, mids, i, len(threads), semaphore, progress, task_id
+                )
             )
-            for i, (tid, mids) in enumerate(threads.items(), 1)
+            for i, ((_account, tid), (provider, mids)) in enumerate(threads.items(), 1)
         ]
 
         for coro in asyncio.as_completed(tasks):

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+Added:
+- Multiple email accounts. List mailboxes under `email_accounts` in config.yml: Google-hosted addresses on any domain (via gog) and any other mailbox via IMAP. One run searches them all, and one failing account no longer stops the rest. IMAP passwords come from environment variables, never from config.
+- Per-account setup checks. Onboarding and health_check verify gog auth for each Google account, warn when a gmail-configured domain is not actually Google-hosted, note the "External" OAuth client requirement for multi-domain setups, and login-test IMAP accounts.
+
+Changed:
+- Message, thread, and attachment ids are account-scoped. The mailbox MCP tools (search_inbox, get_message, download_attachment, archive_thread, draft_reply) take an optional `account` parameter; it is only needed when several accounts are configured.
+- Staged attachment downloads are namespaced by account as well as message, so same-named PDFs from different mailboxes cannot overwrite each other.
+
 ## 0.1.1
 
 Fixes and docs. No breaking changes.

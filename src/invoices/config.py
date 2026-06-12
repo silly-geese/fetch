@@ -3,6 +3,8 @@ from pathlib import Path
 
 import yaml
 
+from .models import EmailAccount
+
 BASE_DIR = (
     Path(os.environ['FETCH_OUTPUT_DIR']).expanduser()
     if 'FETCH_OUTPUT_DIR' in os.environ
@@ -19,11 +21,35 @@ _CONFIG_PATH = (
 )
 STATUSES = ['Paid', 'To-Pay']
 
+
 # Load config.yml tolerantly. If it is missing or invalid, the package still
 # imports (so the MCP server starts and health_check can report the problem) and
 # only operations that actually need it raise, via require_config().
 # VENDOR_SOURCES holds optional per-vendor retrieval recipes (portal URL / login
 # hint / e-invoice operator), matched against checklist vendor names.
+def _parse_email_accounts(cfg: dict) -> list[EmailAccount]:
+    accounts: list[EmailAccount] = []
+    for entry in cfg.get('email_accounts') or []:
+        if isinstance(entry, str):
+            accounts.append(EmailAccount(address=entry))
+            continue
+        imap = entry.get('imap') or {}
+        accounts.append(
+            EmailAccount(
+                address=entry.get('address', ''),
+                provider=entry.get('provider', 'gmail'),
+                imap_host=imap.get('host', ''),
+                imap_port=int(imap.get('port', 993)),
+                imap_username=imap.get('username', ''),
+                imap_password_env=imap.get('password_env', ''),
+                imap_folder=imap.get('folder', 'INBOX'),
+                imap_archive_folder=imap.get('archive_folder', 'Archive'),
+            )
+        )
+    # No accounts configured: fall back to gog's default Gmail account
+    return accounts or [EmailAccount(address='')]
+
+
 CONFIG_ERROR: str | None = None
 try:
     with _CONFIG_PATH.open() as f:
@@ -33,7 +59,15 @@ try:
     DROPBOX_DIRS = {k: Path(v) for k, v in _cfg['dropbox_dirs'].items()}
     DEBTOR_ACCOUNTS = _cfg.get('debtor_accounts', {})
     VENDOR_SOURCES = _cfg.get('vendor_sources', {})
-except (OSError, KeyError, TypeError, AttributeError, yaml.YAMLError) as exc:
+    EMAIL_ACCOUNTS = _parse_email_accounts(_cfg)
+except (
+    OSError,
+    KeyError,
+    TypeError,
+    AttributeError,
+    ValueError,
+    yaml.YAMLError,
+) as exc:
     CONFIG_ERROR = (
         f'config.yml could not be loaded from {_CONFIG_PATH} ({exc}). '
         'Create it from config.example.yml, or set FETCH_CONFIG to its path.'
@@ -43,6 +77,7 @@ except (OSError, KeyError, TypeError, AttributeError, yaml.YAMLError) as exc:
     DROPBOX_DIRS = {}
     DEBTOR_ACCOUNTS = {}
     VENDOR_SOURCES = {}
+    EMAIL_ACCOUNTS = [EmailAccount(address='')]
 
 
 def require_config() -> None:
@@ -55,10 +90,12 @@ def require_config() -> None:
         raise RuntimeError(CONFIG_ERROR)
 
 
+INVOICE_KEYWORDS = ['invoice', 'arve', 'receipt', 'payment', 'facture', 'paiement']
+
 GMAIL_QUERY = (
     'in:inbox -category:(promotions OR social) '
     'has:attachment filename:pdf '
-    '(invoice OR arve OR receipt OR payment OR facture OR paiement)'
+    f'({" OR ".join(INVOICE_KEYWORDS)})'
 )
 
 

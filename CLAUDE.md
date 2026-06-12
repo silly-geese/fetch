@@ -23,7 +23,13 @@ pyproject.toml  # dependencies + ruff config
 ./fetch invoices generate-payments
 ```
 
-## Gmail
+## Email access
+
+Mailboxes are configured under `email_accounts` in `config.yml`. Each is served
+by a `MailProvider` (`providers.py`): `GmailProvider` (`gmail.py`, gog CLI) for
+Google-hosted addresses, `ImapProvider` (`imap.py`, imap-tools) for everything
+else. Message/thread/attachment IDs are account-scoped — always go through the
+provider the message came from (records carry an `account` field).
 
 When working **on this codebase**, route Gmail through the `gog gmail` CLI, not a
 Gmail MCP connector, so calls go through the audited `helpers.async_run` wrapper
@@ -32,12 +38,14 @@ end users: a host agent (e.g. Cowork) may use its own Gmail connector for
 search / read / draft / archive. The one job that still needs `gog` is landing an
 attachment's bytes on disk (`gog gmail attachment`), since connectors return an
 attachment id but not its content, and the rest of the pipeline reads real files.
+Pass `-a <address>` to select an account.
 
 ```bash
-gog gmail search "is:unread" --json
+gog -a you@example.com gmail search "is:unread" --json
 gog gmail get <messageId> --json
 gog gmail thread get <threadId> --full --json
 gog gmail attachment <messageId> <attachmentId> --out <dir> --name <filename>
+gog auth list --json
 gog gmail -h
 ```
 
@@ -58,8 +66,9 @@ uvx ruff format src/
 
 ## Key conventions
 
-- Config values (companies, destination folders, debtor accounts) live in `config.yml`, not hard-coded
+- Config values (companies, destination folders, debtor accounts, email accounts) live in `config.yml`, not hard-coded
 - `DEFAULT_SLUG` in `config.yml` is the fallback company slug
+- IMAP passwords come from env vars (`imap.password_env`), never from config.yml
 - Classification uses `claude` CLI with haiku model (`classify.py`)
 - Models are plain dataclasses in `models.py`
 - All async subprocess calls go through `helpers.py` (`async_run`, `async_run_json`)
