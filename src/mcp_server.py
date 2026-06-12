@@ -36,25 +36,11 @@ from src.invoices.config import (
     require_config,
 )
 from src.invoices.dropbox import copy_to_dropbox as _copy_to_dropbox
-from src.invoices.gmail import (
-    archive_thread as _archive_thread,
-)
-from src.invoices.gmail import (
-    create_directories,
-    search_messages,
-)
-from src.invoices.gmail import (
-    create_draft_reply as _create_draft_reply,
-)
-from src.invoices.gmail import (
-    download_attachment as _download_attachment,
-)
-from src.invoices.gmail import (
-    fetch_message as _fetch_message,
-)
+from src.invoices.gmail import GmailProvider
 from src.invoices.helpers import console, sha1_file
-from src.invoices.models import InvoiceRecord, record_to_dict
-from src.invoices.process import process_messages
+from src.invoices.models import EmailAccount, InvoiceRecord, record_to_dict
+from src.invoices.process import create_directories, process_messages
+from src.invoices.providers import MailProvider, build_providers, search_all_accounts
 from src.invoices.reconcile import (
     build_report as _build_report,
 )
@@ -106,6 +92,47 @@ def _normalize_status(status: str | None) -> str | None:
     return norm
 
 
+def _resolve_provider(account: str | None) -> MailProvider:
+    """Pick the mailbox provider an account-scoped id belongs to.
+
+    With one configured account (the default), ``account`` can be omitted.
+    An address not in config falls back to a Gmail provider for it (gog may
+    still be authenticated), mirroring the CLI's archive behavior.
+    """
+    providers = build_providers()
+    if account is None:
+        if len(providers) == 1:
+            return providers[0]
+        raise ValueError(
+            'Multiple accounts configured; pass account= '
+            f'(one of: {", ".join(p.label for p in providers)})'
+        )
+    for p in providers:
+        if p.address == account:
+            return p
+    return GmailProvider(EmailAccount(address=account))
+
+
+def _resolve_gmail_provider(account: str | None) -> GmailProvider:
+    """Like _resolve_provider, but for operations only Gmail supports (drafts)."""
+    gmail = [p for p in build_providers() if isinstance(p, GmailProvider)]
+    if account is not None:
+        for p in gmail:
+            if p.address == account:
+                return p
+        return GmailProvider(EmailAccount(address=account))
+    if len(gmail) == 1:
+        return gmail[0]
+    if not gmail:
+        raise ValueError(
+            'No Gmail account configured; pass account=<a Google-hosted address>'
+        )
+    raise ValueError(
+        'Multiple Gmail accounts configured; pass account= '
+        f'(one of: {", ".join(p.address for p in gmail)})'
+    )
+
+
 def _validate_companies(companies: list[str] | None) -> None:
     """Raise ValueError if any company slug is unknown (mirrors the CLI)."""
     if not companies:
@@ -132,19 +159,25 @@ async def health_check() -> dict:
 
 @mcp.tool()
 async def search_inbox(
-    query: str | None = None, max_results: int | None = None
+    query: str | None = None, max_results: int | None = None, account: str | None = None
 ) -> dict:
-    """Search the user's Gmail and return matching message/thread ids.
+    """Search the user's mailboxes and return matching message/thread ids.
 
-    ``query`` is a Gmail search expression (e.g. "from:vendor has:attachment").
-    When omitted, the built-in invoice query is used. Useful to preview what
-    ``fetch_invoices`` would process, or to locate a specific email.
+    ``query`` is a Gmail search expression (e.g. "from:vendor has:attachment");
+    IMAP accounts run it as a plain text search. When omitted, the built-in
+    invoice query is used. All configured accounts are searched unless
+    ``account`` narrows it to one address. Ids are account-scoped: pass each
+    message's ``account`` back to ``get_message``/``download_attachment``.
     """
-    messages = await search_messages(max_results, query)
+    providers = [_resolve_provider(account)] if account else build_providers()
+    messages = await search_all_accounts(providers, max_results, query)
     return {
         'query': query or GMAIL_QUERY,
         'count': len(messages),
-        'messages': messages,
+        'messages': [
+            {'id': m['id'], 'threadId': m['threadId'], 'account': m['account']}
+            for m in messages
+        ],
     }
 
 
@@ -152,9 +185,9 @@ async def search_inbox(
 async def fetch_invoices(
     max_emails: int | None = None, query: str | None = None
 ) -> dict:
-    """Fetch invoices from Gmail, classify each PDF with AI, and file them.
+    """Fetch invoices from all configured mailboxes, classify, and file them.
 
-    Runs the full pipeline: search Gmail -> download PDF attachments ->
+    Runs the full pipeline: search every account -> download PDF attachments ->
     classify (company, status, amounts, beneficiary bank details) -> dedupe ->
     organize under the output directory -> write invoices.json + SUMMARY.md.
 
@@ -163,7 +196,7 @@ async def fetch_invoices(
     """
     require_config()
     create_directories()
-    messages = await search_messages(max_emails, query)
+    messages = await search_all_accounts(build_providers(), max_emails, query)
     if not messages:
         log_event('fetch_invoices', {'count': 0, 'query': query or GMAIL_QUERY})
         # No fetch happened, so no summary/json was written; keep the documented
@@ -325,21 +358,29 @@ def generate_payments(
 
 
 @mcp.tool()
-async def archive_thread(thread_id: str) -> dict:
-    """Archive a Gmail thread (remove its INBOX label) by thread id."""
-    await _archive_thread(thread_id)
-    return {'archived': thread_id}
+async def archive_thread(thread_id: str, account: str | None = None) -> dict:
+    """Archive a thread by id: remove it from the inbox of its account.
+
+    Thread ids are account-scoped; pass the ``account`` the id came from
+    (required when several accounts are configured).
+    """
+    provider = _resolve_provider(account)
+    await provider.archive_thread(thread_id)
+    return {'archived': thread_id, 'account': provider.address}
 
 
 @mcp.tool()
-async def get_message(message_id: str) -> dict:
-    """Fetch one Gmail message's headers and attachment list.
+async def get_message(message_id: str, account: str | None = None) -> dict:
+    """Fetch one message's headers and attachment list.
 
     Use after ``search_inbox`` to inspect a candidate email and pick which PDF to
-    pull with ``download_attachment``. Returns subject/sender/date/snippet and
+    pull with ``download_attachment``. Message ids are account-scoped; pass the
+    ``account`` the id came from (required when several accounts are configured).
+    Returns subject/sender/date/snippet and
     ``attachments[{attachment_id, filename, mime_type}]``.
     """
-    msg = await _fetch_message(message_id)
+    provider = _resolve_provider(account)
+    msg = await provider.fetch_message(message_id)
     headers = msg.get('headers', {})
     headers = headers if isinstance(headers, dict) else {}
     attachments = [
@@ -352,6 +393,7 @@ async def get_message(message_id: str) -> dict:
     ]
     return {
         'message_id': message_id,
+        'account': provider.address,
         'thread_id': msg.get('threadId', ''),
         'subject': headers.get('subject', ''),
         'sender': headers.get('from', ''),
@@ -363,17 +405,24 @@ async def get_message(message_id: str) -> dict:
 
 @mcp.tool()
 async def download_attachment(
-    message_id: str, attachment_id: str, filename: str
+    message_id: str, attachment_id: str, filename: str, account: str | None = None
 ) -> dict:
-    """Download one Gmail attachment to the staging dir; returns its local path.
+    """Download one attachment to the staging dir; returns its local path.
 
     Pair with ``get_message`` to retrieve the invoice PDF for a checklist item,
-    then attach the path via ``draft_reply``.
+    then attach the path via ``draft_reply``. Ids are account-scoped; pass the
+    ``account`` the message came from (required when several are configured).
     """
-    path = await _download_attachment(message_id, attachment_id, filename)
+    provider = _resolve_provider(account)
+    path = await provider.download_attachment(message_id, attachment_id, filename)
     log_event(
         'download_attachment',
-        {'message_id': message_id, 'filename': filename, 'path': str(path)},
+        {
+            'message_id': message_id,
+            'account': provider.address,
+            'filename': filename,
+            'path': str(path),
+        },
     )
     return {'path': str(path), 'filename': filename, 'exists': path.exists()}
 
@@ -450,6 +499,7 @@ async def draft_reply(
     reply_to_message_id: str | None = None,
     to: str | None = None,
     subject: str | None = None,
+    account: str | None = None,
 ) -> dict:
     """Create a DRAFT Gmail reply to the accountant with the invoice files attached.
 
@@ -458,8 +508,11 @@ async def draft_reply(
     request email, e.g. from ``search_inbox``/``get_message``) or ``to`` (an email
     address). ``attachments`` is a list of local PDF paths gathered from the inbox
     and/or beyond-inbox retrieval. Put the "still couldn't find: …" note in ``body``.
+    Drafts need a Google-hosted mailbox; with several configured, pass ``account``
+    to pick which one the draft is created in.
     """
-    result = await _create_draft_reply(
+    provider = _resolve_gmail_provider(account)
+    result = await provider.create_draft_reply(
         body=body,
         attachments=attachments or [],
         reply_to_message_id=reply_to_message_id,
@@ -471,6 +524,7 @@ async def draft_reply(
         {
             'reply_to_message_id': reply_to_message_id,
             'to': to,
+            'account': provider.address,
             'attachment_count': len(attachments or []),
             'attachments': attachments or [],
         },

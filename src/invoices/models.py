@@ -3,6 +3,18 @@ from typing import TypedDict
 
 
 @dataclass
+class EmailAccount:
+    address: str
+    provider: str = 'gmail'  # 'gmail' or 'imap'
+    imap_host: str = ''
+    imap_port: int = 993
+    imap_username: str = ''  # defaults to address
+    imap_password_env: str = ''  # env var holding the IMAP password
+    imap_folder: str = 'INBOX'
+    imap_archive_folder: str = 'Archive'
+
+
+@dataclass
 class Attachment:
     message_id: str
     attachment_id: str
@@ -44,6 +56,7 @@ class InvoiceRecord:
     is_overdue: bool = False
     doc_date: str = ''
     thread_id: str = ''
+    account: str = ''  # mailbox the invoice came from; IDs are scoped to it
     sha1: str = ''
     invoice_number: str | None = None
     beneficiary_name: str | None = None
@@ -66,6 +79,7 @@ class ChecklistItem:
 
 class InvoiceRecordDict(TypedDict):
     thread_id: str
+    account: str
     subject: str
     sender: str
     renamed_pdf: str
@@ -89,6 +103,7 @@ class InvoiceRecordDict(TypedDict):
 def record_to_dict(r: InvoiceRecord) -> InvoiceRecordDict:
     return InvoiceRecordDict(
         thread_id=r.thread_id,
+        account=r.account,
         subject=r.subject,
         sender=r.sender,
         renamed_pdf=r.renamed_pdf,

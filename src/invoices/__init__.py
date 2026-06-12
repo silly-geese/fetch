@@ -13,15 +13,16 @@ from src import fetch
 
 from .config import BASE_DIR, COMPANIES, DEBTOR_ACCOUNTS, require_config
 from .dropbox import copy_to_dropbox
-from .gmail import archive_thread, create_directories, search_messages
+from .gmail import GmailProvider
 from .helpers import console
-from .models import InvoiceRecord
+from .models import EmailAccount, InvoiceRecord
 from .payment_xml import (
     fill_missing_bics,
     generate_payment_xml,
     incomplete_beneficiaries,
 )
-from .process import process_messages
+from .process import create_directories, process_messages
+from .providers import build_providers, search_all_accounts
 from .reconcile import build_report, parse_missing_list
 from .reconcile import reconcile as reconcile_items
 from .summary import write_summary
@@ -37,7 +38,7 @@ def invoices():
     '--max-emails', default=None, type=int, help='Limit number of emails to process'
 )
 def fetch(max_emails: int | None):
-    """Fetch invoices from Gmail, classify, and organize."""
+    """Fetch invoices from your mailboxes, classify, and organize."""
     # Save terminal state before asyncio takes over signal handling
     saved_attrs = None
     if sys.stdin.isatty():
@@ -54,7 +55,8 @@ def fetch(max_emails: int | None):
 async def _main(max_emails: int | None):
     require_config()
     create_directories()
-    message_dicts = await search_messages(max_emails)
+    providers = build_providers()
+    message_dicts = await search_all_accounts(providers, max_emails)
 
     if not message_dicts:
         console.print('\n[bold]No messages found. Done.[/bold]')
@@ -252,12 +254,14 @@ def archive(
         console.print('[yellow]No invoices match the given filters.[/yellow]')
         return
 
-    # Deduplicate by thread_id — group records per thread
-    threads: dict[str, list[InvoiceRecord]] = {}
+    # Deduplicate by (account, thread_id) — group records per thread.
+    # Thread IDs are account-scoped, so archiving must go through the
+    # provider the record came from.
+    threads: dict[tuple[str, str], list[InvoiceRecord]] = {}
     for r in records:
         if not r.thread_id:
             continue
-        threads.setdefault(r.thread_id, []).append(r)
+        threads.setdefault((r.account, r.thread_id), []).append(r)
 
     if not threads:
         console.print('[yellow]No threads found (records missing thread_id).[/yellow]')
@@ -266,6 +270,8 @@ def archive(
     thread_items = list(threads.items())
     if max_emails is not None:
         thread_items = thread_items[:max_emails]
+
+    providers = {p.address: p for p in build_providers()}
 
     console.print(f'\nFound [bold]{len(thread_items)}[/bold] thread(s) to review.\n')
 
@@ -277,7 +283,12 @@ def archive(
         saved_attrs = termios.tcgetattr(sys.stdin)
 
     try:
-        for thread_id, thread_records in thread_items:
+        for (account, thread_id), thread_records in thread_items:
+            # Records from accounts no longer in config fall back to a
+            # Gmail provider for that address (gog may still be authed)
+            provider = providers.get(account) or GmailProvider(
+                EmailAccount(address=account)
+            )
             first = thread_records[0]
             pdf_names = ', '.join(r.renamed_pdf for r in thread_records)
             amount_str = (
@@ -285,7 +296,6 @@ def archive(
                 if first.amount_inc_vat
                 else 'N/A'
             )
-            gmail_link = f'https://mail.google.com/mail/u/0/#inbox/{thread_id}'
 
             date_str = first.doc_date or 'N/A'
 
@@ -293,13 +303,16 @@ def archive(
                 f'[bold]Subject:[/bold] {first.subject}\n'
                 f'[bold]From:[/bold] {first.sender}\n'
                 f'[bold]Date:[/bold] {date_str}\n'
+                f'[bold]Account:[/bold] {provider.label}\n'
                 f'[bold]Status:[/bold] {first.status}\n'
                 f'[bold]Company:[/bold] {first.company}\n'
                 f'[bold]Amount:[/bold] {amount_str}\n'
                 f'[bold]Summary:[/bold] {first.summary}\n'
-                f'[bold]PDF(s):[/bold] {pdf_names}\n'
-                f'[bold]Thread:[/bold] {gmail_link}'
+                f'[bold]PDF(s):[/bold] {pdf_names}'
             )
+            if isinstance(provider, GmailProvider):
+                gmail_link = f'https://mail.google.com/mail/u/0/#inbox/{thread_id}'
+                panel_text += f'\n[bold]Thread:[/bold] {gmail_link}'
             console.print(Panel(panel_text, title=f'Thread {thread_id[:12]}…'))
 
             if dry_run:
@@ -310,7 +323,7 @@ def archive(
             should_archive = yes or Confirm.ask('  Archive this thread?', default=False)
 
             if should_archive:
-                asyncio.run(archive_thread(thread_id))
+                asyncio.run(provider.archive_thread(thread_id))
                 console.print('[green]  Archived.[/green]\n')
                 archived += 1
             else:

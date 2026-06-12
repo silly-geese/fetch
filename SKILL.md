@@ -12,6 +12,10 @@ This server stores **no passwords or tokens**. It runs locally and shells out to
 - **`gog`**: your Gmail session (search, fetch attachments, draft replies).
 - **`claude`**: classifies each PDF (runs the `haiku` model locally).
 
+Non-Google mailboxes connect over IMAP instead; the password comes from an
+environment variable named in `config.yml` (`imap.password_env`), never from
+the config file itself.
+
 If those aren't set up, every tool can tell you: call `health_check` first.
 
 **If you already have your own Gmail connector** (e.g. running inside Cowork), use
@@ -63,25 +67,31 @@ only Dropbox), and your debtor bank accounts. Verify with
 
 | Tool | Purpose |
 |------|---------|
-| `health_check()` | Check gog CLI, claude CLI, Gmail auth, and config.yml. Returns `{ok, checks[]}`. Call this first. |
-| `search_inbox(query?, max_results?)` | Raw Gmail search, returns `{query, count, messages[{id, threadId}]}`. `query` defaults to the built-in invoice search. |
-| `get_message(message_id)` | One message's headers plus `attachments[{attachment_id, filename, mime_type}]`. Use it to pick which PDF to pull. |
-| `download_attachment(message_id, attachment_id, filename)` | Download one attachment to staging, returns `{path, filename, exists}`. |
-| `fetch_invoices(max_emails?, query?)` | The full pipeline: search Gmail, download PDFs, classify, dedupe, file under `output/`, write `invoices.json` and `SUMMARY.md`. Returns `{count, invoices[], output_dir, summary_md, invoices_json}`. |
+| `health_check()` | Check gog CLI, claude CLI, per-account mail auth (Gmail and IMAP), and config.yml. Returns `{ok, checks[], warnings[]}`. Call this first. |
+| `search_inbox(query?, max_results?, account?)` | Search every configured mailbox (or one `account`), returns `{query, count, messages[{id, threadId, account}]}`. `query` defaults to the built-in invoice search; IMAP accounts run it as plain text. |
+| `get_message(message_id, account?)` | One message's headers plus `attachments[{attachment_id, filename, mime_type}]`. Use it to pick which PDF to pull. |
+| `download_attachment(message_id, attachment_id, filename, account?)` | Download one attachment to staging, returns `{path, filename, exists}`. |
+| `fetch_invoices(max_emails?, query?)` | The full pipeline: search all mailboxes, download PDFs, classify, dedupe, file under `output/`, write `invoices.json` and `SUMMARY.md`. Returns `{count, invoices[], output_dir, summary_md, invoices_json}`. |
 | `classify_invoice(pdf_path, subject?, sender?, snippet?)` | Classify one local PDF (e.g. one you downloaded yourself) into the same record shape. Does **not** move the file. |
 | `list_invoices(status?, company?)` | Read back the last fetch from `invoices.json`, filtered by status (`Paid`/`To-Pay`) and/or company slug. No network. |
 | `copy_to_dropbox(status?, companies?)` | Copy filed PDFs into each company's configured folder (`dropbox_dirs` in config.yml, any folder and not only Dropbox). Returns `{copied, skipped, errors, details[]}`. |
 | `generate_payments(companies?, execution_date?)` | Build SEPA `pain.001.001.03` XML for To-Pay invoices, one file per debtor company. Derives missing BICs from Estonian IBANs. Returns `{count, files[], derived_bics[], skipped[]}`. |
-| `archive_thread(thread_id)` | Remove the INBOX label from a Gmail thread. |
+| `archive_thread(thread_id, account?)` | Remove a thread from its account's inbox. |
 | `parse_missing_list(text)` | Turn an accountant's free-form missing/expected-invoice list (pasted text, CSV, table, email) into a structured checklist, returns `{count, items[]}`. |
 | `reconcile(checklist, collected?)` | Match the checklist against collected invoices (or the last fetch if `collected` omitted). Returns `{summary, matched[], still_missing[], unmatched_collected[]}`. Deterministic. |
 | `build_report(reconciliation, title?)` | Render a reconcile result as Markdown, write `REPORT.md`, return `{report_md, path}`. Optional summary for the accountant. |
 | `plan_retrieval(items)` | For invoices NOT in the inbox, return retrieval tasks per item (vendor, identifiers, any `config.yml` per-vendor recipe, suggested sources, instructions). You fetch each with your own browser, then attach via `draft_reply`. |
-| `draft_reply(body, attachments?, reply_to_message_id?, to?, subject?)` | Create a **draft** Gmail reply to the accountant with the invoice files attached. Never auto-sends; a human reviews and sends. |
+| `draft_reply(body, attachments?, reply_to_message_id?, to?, subject?, account?)` | Create a **draft** Gmail reply to the accountant with the invoice files attached. Never auto-sends; a human reviews and sends. |
 | `read_audit(limit?)` | Read the local audit log (`output/audit.log`). Every fetch, download, and draft is recorded. |
 
 Statuses are case-insensitive (`paid`, `to-pay`, `all`). Company values are the
 slugs from `config.yml`.
+
+**Multiple accounts.** With `email_accounts` configured in `config.yml`, message,
+thread, and attachment ids are scoped to the account they came from. Pass each
+message's `account` (from `search_inbox`) back to `get_message`,
+`download_attachment`, and `archive_thread`. With a single account, omit it.
+Drafts always go through a Google-hosted account.
 
 ## Main workflow: clear a missing-invoice list
 

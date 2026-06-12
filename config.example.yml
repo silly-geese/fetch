@@ -35,3 +35,21 @@ vendor_sources:
   #   login_hint: "log in with the company Google account; invoices under Billing > History"
   #   einvoice_operator: "Envoice"
   #   notes: "monthly subscription, issued on the 1st"
+
+# Optional. Mailboxes to search. Without this, the Gmail account `gog` is
+# signed in to is used. Google-hosted addresses (gmail.com or any Workspace
+# domain) need `gog auth add <address>` once each. Anything else goes through
+# IMAP; the password comes from the env var named in `password_env`, never
+# from this file (use an app password for providers with two-factor auth).
+email_accounts:
+  # - address: you@example.com
+  # - address: info@other-domain.com
+  # - address: user@elsewhere.com
+  #   provider: imap
+  #   imap:
+  #     host: imap.elsewhere.com
+  #     port: 993                       # optional, default 993
+  #     username: user@elsewhere.com    # optional, defaults to address
+  #     password_env: ELSEWHERE_IMAP_PASSWORD
+  #     folder: INBOX                   # optional
+  #     archive_folder: Archive         # optional, used when archiving
